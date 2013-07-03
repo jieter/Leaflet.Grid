@@ -4,8 +4,8 @@
 
 L.Grid = L.LayerGroup.extend({
 	options: {
-		xticks: 12,
-		yticks: 8,
+		xticks: 8,
+		yticks: 5,
 
 		// 'decimal' or one of the templates below
 		coordStyle: 'MinDec',
@@ -74,7 +74,7 @@ L.Grid = L.LayerGroup.extend({
 		return this._lines(
 			this._bounds.getSouth(),
 			this._bounds.getNorth(),
-			this.options.yticks,
+			this.options.yticks * 2,
 			this._containsEquator()
 		);
 	},
@@ -82,24 +82,23 @@ L.Grid = L.LayerGroup.extend({
 		return this._lines(
 			this._bounds.getWest(),
 			this._bounds.getEast(),
-			this.options.xticks,
+			this.options.xticks * 2,
 			this._containsIRM()
 		);
 	},
 
 	_lines: function (low, high, ticks, containsZero) {
 		var delta = low - high,
-			tick = this.snap(delta / ticks, delta);
-		// TODO fix zero tick size
+			tick = this._round(delta / ticks, delta);
 
 		if (containsZero) {
 			low = Math.floor(low / tick) * tick;
 		} else {
-			low = this.snap(low + 0.5 * tick);
+			low = this._snap(low, tick);
 		}
 
 		var lines = [];
-		for (var i = 0; i <= ticks; i++) {
+		for (var i = -1; i <= ticks; i++) {
 			lines.push(low - (i * tick));
 		}
 		return lines;
@@ -128,22 +127,30 @@ L.Grid = L.LayerGroup.extend({
 		], this.options.lineStyle);
 	},
 
-	// TODO: think of a better snap
-	snap: function (num, delta) {
+	_snap: function (num, gridSize) {
+		return Math.floor(num / gridSize) * gridSize;
+	},
+
+	_round: function (num, delta) {
 		var ret;
 
 		delta = Math.abs(delta);
-		var div = 60;
-		if (delta > 100) {
-			return Math.floor(num / 15) * 15;
-		} else if (delta > 50) {
-			return Math.floor(num / 5) * 5;
-		} else if(delta > 10) {
-			div = 6;
+		if (delta >= 1) {
+			if (Math.abs(num) > 1) {
+				ret = Math.round(num);
+			} else {
+				ret = (num < 0) ? Math.floor(num) : Math.ceil(num);
+			}
 		} else {
-			div = 1;
+			var dms = this._dec2dms(delta);
+			if (dms.min >= 1) {
+				ret = Math.ceil(dms.min) * 60;
+			} else {
+				ret = Math.ceil(dms.minDec * 60);
+			}
 		}
-		return Math.round(num * div) / div;
+
+		return ret;
 	},
 
 	_label: function (axis, num) {
@@ -164,47 +171,55 @@ L.Grid = L.LayerGroup.extend({
 		});
 	},
 
+	_dec2dms: function (num) {
+		var deg = Math.floor(num);
+		var min = ((num - deg) * 60);
+		var sec = Math.floor((min - Math.floor(min)) * 60);
+		return {
+			deg: deg,
+			degAbs: Math.abs(deg),
+			min: Math.floor(min),
+			minDec: min,
+			sec: sec
+		};
+	},
+
 	formatCoord: function (num, axis, style) {
 		if (!style) {
 			style = this.options.coordStyle;
 		}
-		switch (style) {
-			case 'decimal':
-				var digits;
-				if (num >= 10) {
-					digits = 2;
-				} else if (num >= 1) {
-					digits = 3;
+		if (style == 'decimal') {
+			var digits;
+			if (num >= 10) {
+				digits = 2;
+			} else if (num >= 1) {
+				digits = 3;
+			} else {
+				digits = 4;
+			}
+			return num.toFixed(digits);
+		} else {
+			// Calculate some values to allow flexible templating
+			var dms = this._dec2dms(num);
+
+			var dir;
+			if (dms.deg === 0) {
+				dir = '&nbsp;';
+			} else {
+				if (axis == 'lat') {
+					dir = (dms.deg > 0 ? 'N' : 'S');
 				} else {
-					digits = 4;
+					dir = (dms.deg > 0 ? 'E' : 'W');
 				}
-				return num.toFixed(digits);
+			}
 
-			default:
-				// Calculate some values to allow flexible templating
-				var deg = Math.floor(num);
-				var min = ((num - deg) * 60);
-				var sec = Math.floor((min - Math.floor(min)) * 60);
-
-				var dir;
-				if (deg === 0) {
-					dir = '&nbsp;';
-				} else {
-					if (axis == 'lat') {
-						dir = (deg > 0 ? 'N' : 'S');
-					} else {
-						dir = (deg > 0 ? 'E' : 'W');
-					}
-				}
-
-				return L.Util.template(this.options.coordTemplates[style], {
-					deg: deg,
-					degAbs: Math.abs(deg),
-					min: Math.floor(min),
-					minDec: Math.round(min),
-					sec: Math.floor(sec),
-					dir: dir
-				});
+			return L.Util.template(
+				this.options.coordTemplates[style],
+				L.Util.extend(dms, {
+					dir: dir,
+					minDec: Math.round(dms.minDec, 2)
+				})
+			);
 		}
 	}
 
