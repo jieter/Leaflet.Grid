@@ -2,17 +2,19 @@
  * L.Grid displays a grid of lat/lng lines on the map.
  */
 
-
 L.Grid = L.LayerGroup.extend({
 	options: {
 		xticks: 12,
 		yticks: 8,
 
-		coordStyle: 'MinDec', // decimal or one of the templates below
+		// 'decimal' or one of the templates below
+		coordStyle: 'MinDec',
 		coordTemplates: {
-			'MinDec': '{deg}&deg;&nbsp;{minDec}\'{dir}',
+			'MinDec': '{degAbs}&deg;&nbsp;{minDec}\'{dir}',
 			'DMS': '{degAbs}{dir}{min}\'{sec}"'
 		},
+
+		// Path style for the grid lines
 		lineStyle: {
 			stroke: true,
 			color: '#111',
@@ -69,57 +71,47 @@ L.Grid = L.LayerGroup.extend({
 	},
 
 	_latLines: function () {
-		var ticks = this.options.yticks,
-			north = this._bounds.getNorth(),
-			south = this._bounds.getSouth();
-
-		var delta = north - south,
-			tick = this.snap(delta / ticks, delta);
-		// TODO fix zero tick size
-
-		if (this._containsEquator()) {
-			north = Math.floor(north / tick) * tick;
-		} else {
-			north = this.snap(north + 0.5 * tick);
-		}
-
-		return this._lines(north, ticks, -tick);
+		return this._lines(
+			this._bounds.getSouth(),
+			this._bounds.getNorth(),
+			this.options.yticks,
+			this._containsEquator()
+		);
 	},
 	_lngLines: function () {
-		var ticks = this.options.xticks,
-			west = this._bounds.getWest(),
-			east = this._bounds.getEast();
+		return this._lines(
+			this._bounds.getWest(),
+			this._bounds.getEast(),
+			this.options.xticks,
+			this._containsIRM()
+		);
+	},
 
-		var delta = west - east;
+	_lines: function (low, high, ticks, containsZero) {
+		var delta = low - high,
 			tick = this.snap(delta / ticks, delta);
 		// TODO fix zero tick size
 
-		if (this._containsIRM()) {
-			west = Math.floor(west / tick) * tick;
+		if (containsZero) {
+			low = Math.floor(low / tick) * tick;
 		} else {
-			west = this.snap(west + 0.5 * tick);
+			low = this.snap(low + 0.5 * tick);
 		}
 
-		return this._lines(west, ticks, -tick);
-	},
-
-	_lines: function (base, count, size) {
 		var lines = [];
-		for (var i = 0; i <= count; i++) {
-			lines.push(base + (i * size));
+		for (var i = 0; i <= ticks; i++) {
+			lines.push(low - (i * tick));
 		}
 		return lines;
 	},
 
 	_containsEquator: function () {
 		var bounds = this._map.getBounds();
-
 		return bounds.getSouth() < 0 && bounds.getNorth() > 0;
 	},
 
 	_containsIRM: function () {
 		var bounds = this._map.getBounds();
-
 		return bounds.getWest() < 0 && bounds.getEast() > 0;
 	},
 
@@ -136,6 +128,7 @@ L.Grid = L.LayerGroup.extend({
 		], this.options.lineStyle);
 	},
 
+	// TODO: think of a better snap
 	snap: function (num, delta) {
 		var ret;
 
@@ -188,6 +181,7 @@ L.Grid = L.LayerGroup.extend({
 				return num.toFixed(digits);
 
 			default:
+				// Calculate some values to allow flexible templating
 				var deg = Math.floor(num);
 				var min = ((num - deg) * 60);
 				var sec = Math.floor((min - Math.floor(min)) * 60);
