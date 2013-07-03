@@ -5,23 +5,19 @@
 
 L.Grid = L.LayerGroup.extend({
 	options: {
-		xticks: 16,
-		yticks: 12,
-		styles: {
-			all: {
-				stroke: true,
-				color: '#111',
-				weight: 5,
-				opacity: 0.6
-			},
-			minor: {
-				weight: 1,
-				opacity: 0.6
-			},
-			major: {
-				weight: 2,
-				opacity: 0.9
-			}
+		xticks: 12,
+		yticks: 8,
+
+		coordStyle: 'MinDec', // decimal or one of the templates below
+		coordTemplates: {
+			'MinDec': '{deg}&deg;&nbsp;{minDec}\'{dir}',
+			'DMS': '{degAbs}{dir}{min}\'{sec}"'
+		},
+		lineStyle: {
+			stroke: true,
+			color: '#111',
+			opacity: 0.6,
+			weight: 1
 		}
 	},
 
@@ -29,40 +25,6 @@ L.Grid = L.LayerGroup.extend({
 		L.LayerGroup.prototype.initialize.call(this);
 		L.Util.setOptions(this, options);
 
-	},
-	redraw: function () {
-		this._bounds = this._map.getBounds().pad(0.5);
-
-		var grid = [];
-		var i;
-
-		// Choose a major grid lines
-		var majorLat = this._majorLatitude();
-		grid.push(this._horizontalLine(majorLat, 'major'));
-		grid.push(this._label('lat', majorLat));
-
-		var minors = this._minorLatitudes(majorLat);
-		for (i in minors) {
-			grid.push(this._horizontalLine(minors[i], 'minor'));
-			grid.push(this._label('lat', minors[i]));
-		}
-
-		var majorLng = this._majorLongitude();
-		grid.push(this._verticalLine(majorLng, 'major'));
-		grid.push(this._label('lng', majorLng));
-
-		minors = this._minorLongitudes(majorLng);
-		for (i in minors) {
-			grid.push(this._verticalLine(minors[i], 'minor'));
-			grid.push(this._label('lng', minors[i]));
-		}
-
-		this.eachLayer(this.removeLayer, this);
-
-		for (i in grid) {
-			this.addLayer(grid[i]);
-		}
-		return this;
 	},
 
 	onAdd: function (map) {
@@ -75,86 +37,118 @@ L.Grid = L.LayerGroup.extend({
 
 		this.eachLayer(map.addLayer, map);
 	},
-	_majorLongitude: function () {
-		if (this._bounds.getEast() > 0 && this._bounds.getWest() < 0) {
-			// Greenwich 0-meredian
-			return 0;
-		} else {
-			var dlng = this._bounds.getEast() - this._bounds.getWest();
-			return this.round(this._bounds.getWest() + 2 * (dlng / this.options.xticks), dlng);
-		}
-	},
-	_majorLatitude: function () {
-		if (this._bounds.getSouth() < 0 && this._bounds.getNorth() > 0) {
-			// equator
-			return 0;
-		} else {
-			var dlat = this._bounds.getNorth() - this._bounds.getSouth();
-			return this.round(this._bounds.getNorth() - dlat / this.options.yticks, dlat);
-		}
-	},
 
-	_minorLatitudes: function (majorLat) {
-		var ticks = this.options.yticks;
-		var dlat = this._bounds.getNorth() - this._bounds.getSouth();
-		var tick = dlat / ticks;
-		var ret = [];
+	redraw: function () {
+		// pad the bounds to make sure we draw the lines a little longer
+		this._bounds = this._map.getBounds().pad(0.5);
 
-		for (var i = -1; i <= ticks; i++) {
-			if (i === 0) {
+		var grid = [];
+		var i;
+
+		var latLines = this._latLines();
+		for (i in latLines) {
+			if (Math.abs(latLines[i]) > 90) {
 				continue;
 			}
-			var lat = majorLat - (i * tick);
-			ret.push(lat);
-
+			grid.push(this._horizontalLine(latLines[i]));
+			grid.push(this._label('lat', latLines[i]));
 		}
-		return ret;
-	},
-	_minorLongitudes: function (majorLng) {
-		var ticks = this.options.yticks;
-		var dlng = this._bounds.getEast() - this._bounds.getWest();
-		var tick = dlng / ticks;
-		var ret = [];
 
-		for (var i = -1; i <= ticks; i++) {
-			if (i === 0) {
-				continue;
-			}
-			var lat = majorLng + (i * tick);
-			ret.push(lat);
-
+		var lngLines = this._lngLines();
+		for (i in lngLines) {
+			grid.push(this._verticalLine(lngLines[i]));
+			grid.push(this._label('lng', lngLines[i]));
 		}
-		return ret;
+
+		this.eachLayer(this.removeLayer, this);
+
+		for (i in grid) {
+			this.addLayer(grid[i]);
+		}
+		return this;
 	},
 
-	_verticalLine: function (lng, type) {
+	_latLines: function () {
+		var ticks = this.options.yticks,
+			north = this._bounds.getNorth(),
+			south = this._bounds.getSouth();
+
+		var delta = north - south,
+			tick = this.snap(delta / ticks, delta);
+		// TODO fix zero tick size
+
+		if (this._containsEquator()) {
+			north = Math.floor(north / tick) * tick;
+		} else {
+			north = this.snap(north + 0.5 * tick);
+		}
+
+		return this._lines(north, ticks, -tick);
+	},
+	_lngLines: function () {
+		var ticks = this.options.xticks,
+			west = this._bounds.getWest(),
+			east = this._bounds.getEast();
+
+		var delta = west - east;
+			tick = this.snap(delta / ticks, delta);
+		// TODO fix zero tick size
+
+		if (this._containsIRM()) {
+			west = Math.floor(west / tick) * tick;
+		} else {
+			west = this.snap(west + 0.5 * tick);
+		}
+
+		return this._lines(west, ticks, -tick);
+	},
+
+	_lines: function (base, count, size) {
+		var lines = [];
+		for (var i = 0; i <= count; i++) {
+			lines.push(base + (i * size));
+		}
+		return lines;
+	},
+
+	_containsEquator: function () {
+		var bounds = this._map.getBounds();
+
+		return bounds.getSouth() < 0 && bounds.getNorth() > 0;
+	},
+
+	_containsIRM: function () {
+		var bounds = this._map.getBounds();
+
+		return bounds.getWest() < 0 && bounds.getEast() > 0;
+	},
+
+	_verticalLine: function (lng) {
 		return new L.Polyline([
 			[this._bounds.getNorth(), lng],
 			[this._bounds.getSouth(), lng]
-		], this._getTypeStyle(type));
+		], this.options.lineStyle);
 	},
-	_horizontalLine: function (lat, type) {
+	_horizontalLine: function (lat) {
 		return new L.Polyline([
 			[lat, this._bounds.getWest()],
 			[lat, this._bounds.getEast()]
-		], this._getTypeStyle(type));
+		], this.options.lineStyle);
 	},
 
-	_getTypeStyle: function (type) {
-		return L.Util.extend({}, this.options.styles.all, this.options.styles[type]);
-	},
-
-	round: function (num, delta) {
+	snap: function (num, delta) {
 		var ret;
 
 		delta = Math.abs(delta);
 		var div = 60;
 		if (delta > 100) {
-			return Math.floor(num / 30) * 30;
-		} else if (delta > 60) {
 			return Math.floor(num / 15) * 15;
+		} else if (delta > 50) {
+			return Math.floor(num / 5) * 5;
 		} else if(delta > 10) {
 			div = 6;
+		} else {
+			div = 1;
 		}
 		return Math.round(num * div) / div;
 	},
@@ -167,22 +161,57 @@ L.Grid = L.LayerGroup.extend({
 		} else {
 			location = L.latLng(bounds.getNorth(), num);
 		}
-		console.log(location.toString());
+
 		return L.marker(location, {
 			icon: L.divIcon({
 				iconSize: [0, 0],
 				className: 'leaflet-grid-label leaflet-grid-label-' + axis,
-				html: '<div class="' + axis + '">' + this.formatCoord(num) + '</div>'
+				html: '<div class="' + axis + '">' + this.formatCoord(num, axis) + '</div>'
 			})
 		});
 	},
 
-	formatCoord: function (coord) {
-		// if (this.options.style === 'decimal') {
-			return L.Util.formatNum(coord, 2);
-		// } else {
-			// return 'Not implemented';
-		// }
+	formatCoord: function (num, axis, style) {
+		if (!style) {
+			style = this.options.coordStyle;
+		}
+		switch (style) {
+			case 'decimal':
+				var digits;
+				if (num >= 10) {
+					digits = 2;
+				} else if (num >= 1) {
+					digits = 3;
+				} else {
+					digits = 4;
+				}
+				return num.toFixed(digits);
+
+			default:
+				var deg = Math.floor(num);
+				var min = ((num - deg) * 60);
+				var sec = Math.floor((min - Math.floor(min)) * 60);
+
+				var dir;
+				if (deg === 0) {
+					dir = '&nbsp;';
+				} else {
+					if (axis == 'lat') {
+						dir = (deg > 0 ? 'N' : 'S');
+					} else {
+						dir = (deg > 0 ? 'E' : 'W');
+					}
+				}
+
+				return L.Util.template(this.options.coordTemplates[style], {
+					deg: deg,
+					degAbs: Math.abs(deg),
+					min: Math.floor(min),
+					minDec: Math.round(min),
+					sec: Math.floor(sec),
+					dir: dir
+				});
+		}
 	}
 
 });
