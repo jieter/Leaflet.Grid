@@ -134,6 +134,7 @@ L.Grid = L.LayerGroup.extend({
 	_round: function (num, delta) {
 		var ret;
 
+
 		delta = Math.abs(delta);
 		if (delta >= 1) {
 			if (Math.abs(num) > 1) {
@@ -154,19 +155,26 @@ L.Grid = L.LayerGroup.extend({
 	},
 
 	_label: function (axis, num) {
-		var location;
-		var bounds = this._map.getBounds().pad(-0.01);
-		if (axis == 'lat') {
-			location = L.latLng(num, bounds.getWest());
+		var latlng;
+		var bounds = this._map.getBounds().pad(-0.005);
+		var html = L.DomUtil.create('div', axis);
+		
+		if (axis == 'lng') {
+			latlng = L.latLng(bounds.getNorth(), num);
+	
+			html.style.marginLeft = '8px';
+			html.style[L.DomUtil.TRANSFORM] = 'rotate(90deg)';
 		} else {
-			location = L.latLng(bounds.getNorth(), num);
+			latlng = L.latLng(num, bounds.getWest());
 		}
 
-		return L.marker(location, {
+		html.innerHTML = this.formatCoord(num, axis);
+		
+		return L.marker(latlng, {
 			icon: L.divIcon({
 				iconSize: [0, 0],
-				className: 'leaflet-grid-label leaflet-grid-label-' + axis,
-				html: '<div class="' + axis + '">' + this.formatCoord(num, axis) + '</div>'
+				className: 'leaflet-grid-label',
+				html: html
 			})
 		});
 	},
