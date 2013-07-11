@@ -157,24 +157,18 @@ L.Grid = L.LayerGroup.extend({
 	_label: function (axis, num) {
 		var latlng;
 		var bounds = this._map.getBounds().pad(-0.005);
-		var html = L.DomUtil.create('div', axis);
-		
+
 		if (axis == 'lng') {
 			latlng = L.latLng(bounds.getNorth(), num);
-	
-			html.style.marginLeft = '8px';
-			html.style[L.DomUtil.TRANSFORM] = 'rotate(90deg)';
 		} else {
 			latlng = L.latLng(num, bounds.getWest());
 		}
 
-		html.innerHTML = this.formatCoord(num, axis);
-		
 		return L.marker(latlng, {
 			icon: L.divIcon({
 				iconSize: [0, 0],
 				className: 'leaflet-grid-label',
-				html: html
+				html: '<div class="' + axis + '">' + this.formatCoord(num, axis) + '</div>'
 			})
 		});
 	},
