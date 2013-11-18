@@ -13,7 +13,7 @@ Leaflet.Grid needs some CSS to look pretty:
 	transform: rotate(90deg);
 }
 ```
-Then, after including the `L.Grid.js` file and creating the map, just call:
+Then, after including the `L.Grid.js` file and creating the `map`, just call:
 
 ```JavaScript
 L.grid().addTo(map);

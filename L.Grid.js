@@ -134,7 +134,6 @@ L.Grid = L.LayerGroup.extend({
 	_round: function (num, delta) {
 		var ret;
 
-
 		delta = Math.abs(delta);
 		if (delta >= 1) {
 			if (Math.abs(num) > 1) {
