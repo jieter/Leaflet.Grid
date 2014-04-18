@@ -19,6 +19,14 @@ Then, after including the `L.Grid.js` file and creating the `map`, just call:
 L.grid().addTo(map);
 ```
 
+You can redraw the grid on every movement (default) or on the end of the movement by setting the option `redraw: 'moveend'`:
+
+```JavaScript
+L.grid({
+	redraw: 'moveend'
+}).addTo(map);
+```
+
 TODO
 ----
  - Fix snapping / tick size for small zoomlevels
