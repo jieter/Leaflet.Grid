@@ -20,7 +20,10 @@ L.Grid = L.LayerGroup.extend({
 			color: '#111',
 			opacity: 0.6,
 			weight: 1
-		}
+		},
+		
+		// Redraw on move or moveend
+		redraw: 'move'
 	},
 
 	initialize: function (options) {
@@ -33,7 +36,7 @@ L.Grid = L.LayerGroup.extend({
 		this._map = map;
 
 		var grid = this.redraw();
-		this._map.on('viewreset move', function () {
+		this._map.on('viewreset '+ this.options.redraw, function () {
 			grid.redraw();
 		});
 
@@ -42,7 +45,7 @@ L.Grid = L.LayerGroup.extend({
 	
 	onRemove: function (map) {
 		// remove layer listeners and elements
-		map.off('viewreset move', this.map);
+		map.off('viewreset '+ this.options.redraw, this.map);
 		this.eachLayer(this.removeLayer, this);
 	},
 
