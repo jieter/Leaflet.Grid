@@ -39,6 +39,12 @@ L.Grid = L.LayerGroup.extend({
 
 		this.eachLayer(map.addLayer, map);
 	},
+	
+	onRemove: function (map) {
+		// remove layer listeners and elements
+		map.off('viewreset move', this.map);
+		this.eachLayer(this.removeLayer, this);
+	},
 
 	redraw: function () {
 		// pad the bounds to make sure we draw the lines a little longer
